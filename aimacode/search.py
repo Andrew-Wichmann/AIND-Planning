@@ -349,17 +349,20 @@ class InstrumentedProblem(Problem):
         return getattr(self.problem, attr)
 
     def __repr__(self):
-        return '<%4d/%4d/%4d/%s>' % (self.succs, self.goal_tests,
-                                     self.states, str(self.found)[:4])
+        from lp_utils import decode_state
+        return '<%4d\t\t/%4d\t\t/%4d\t\t/%s>' % (self.succs, self.goal_tests,
+                                     self.states, decode_state(str(self.found)[:4], self.problem.state_map[:4]).sentence())
 
 
 def compare_searchers(problems, header,
-                      searchers=[breadth_first_tree_search,
+                      searchers=[
+                                 #breadth_first_tree_search,
                                  breadth_first_search,
                                  depth_first_graph_search,
                                  iterative_deepening_search,
                                  depth_limited_search,
-                                 recursive_best_first_search]):
+                                 #recursive_best_first_search
+                                 ]):
     def do(searcher, problem):
         p = InstrumentedProblem(problem)
         searcher(p)

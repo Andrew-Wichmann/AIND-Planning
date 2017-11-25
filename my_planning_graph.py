@@ -303,6 +303,12 @@ class PlanningGraph():
         :return:
             adds A nodes to the current level in self.a_levels[level]
         """
+        self.a_levels.append(set()) ##could optimize by adding in all actions from previous action level instead of re-computing
+        for action in self.all_actions:
+            proposed_node = PgNode_a(action) ##could optimize using a memo
+            if all(pre_cond in self.s_levels[level] for pre_cond in proposed_node.prenodes):
+                self.a_levels[level].add(proposed_node)
+                [(proposed_node.parents.add(parent), parent.children.add(proposed_node)) for parent in proposed_node.prenodes]
         # TODO add action A level to the planning graph as described in the Russell-Norvig text
         # 1. determine what actions to add and create those PgNode_a objects
         # 2. connect the nodes to the previous S literal level
@@ -320,6 +326,10 @@ class PlanningGraph():
         :return:
             adds S nodes to the current level in self.s_levels[level]
         """
+        self.s_levels.append(set())
+        for action in self.a_levels[level-1]:
+            [(self.s_levels[level].add(node), node.parents.add(action), action.children.add(node)) for node in action.effnodes]
+
         # TODO add literal S level to the planning graph as described in the Russell-Norvig text
         # 1. determine what literals to add
         # 2. connect the nodes
@@ -385,7 +395,10 @@ class PlanningGraph():
         :param node_a2: PgNode_a
         :return: bool
         """
-        # TODO test for Inconsistent Effects between nodes
+        if any([effect in node_a2.action.effect_rem for effect in node_a1.action.effect_add]):
+            return True
+        if any([effect in node_a1.action.effect_rem for effect in node_a2.action.effect_add]):
+            return True
         return False
 
     def interference_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
@@ -402,7 +415,15 @@ class PlanningGraph():
         :param node_a2: PgNode_a
         :return: bool
         """
-        # TODO test for Interference between nodes
+        # Not confident this is correct
+        if any([effect in node_a1.action.precond_pos for effect in node_a2.action.effect_rem]):
+            return True
+        # if any([effect in node_a1.action.precond_neg for effect in node_a2.action.effect_add]):
+        #     return True
+        if any([effect in node_a2.action.precond_pos for effect in node_a1.action.effect_rem]):
+            return True
+        # if any([effect in node_a2.action.precond_neg for effect in node_a1.action.effect_add]):
+        #     return True
         return False
 
     def competing_needs_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
@@ -416,7 +437,8 @@ class PlanningGraph():
         :return: bool
         """
 
-        # TODO test for Competing Needs between nodes
+        if any([state1.is_mutex(state2) for state1 in node_a1.parents for state2 in node_a2.parents]):
+            return True
         return False
 
     def update_s_mutex(self, nodeset: set):
@@ -451,7 +473,8 @@ class PlanningGraph():
         :param node_s2: PgNode_s
         :return: bool
         """
-        # TODO test for negation between nodes
+        if node_s1.symbol == node_s2.symbol and node_s1.is_pos != node_s2.is_pos:
+            return True
         return False
 
     def inconsistent_support_mutex(self, node_s1: PgNode_s, node_s2: PgNode_s):
@@ -470,7 +493,8 @@ class PlanningGraph():
         :param node_s2: PgNode_s
         :return: bool
         """
-        # TODO test for Inconsistent Support between nodes
+        if all([action_node1.is_mutex(action_node2) for action_node1 in node_s1.parents for action_node2 in node_s2.parents]):
+            return True
         return False
 
     def h_levelsum(self) -> int:
@@ -479,6 +503,10 @@ class PlanningGraph():
         :return: int
         """
         level_sum = 0
-        # TODO implement
-        # for each goal in the problem, determine the level cost, then add them together
+        goals_not_achieved = self.problem.goal.copy()
+        for level_num, state_level in enumerate(self.s_levels, start=0):
+            for state in state_level:
+                if state.symbol in goals_not_achieved and not state.is_pos:
+                    goals_not_achieved.remove(state.symbol)
+                    level_sum += level_num
         return level_sum
